@@ -1,54 +1,121 @@
-services:
-    clickhouse:
-        pull_policy: always
-    kafka:
-        pull_policy: always
-    postgres:
-        pull_policy: always
-    redis:
-        pull_policy: always
-    zookeeper:
-        pull_policy: always
-    collector:
-        build:
-            context: .
-            args:
-                OTEL_COLLECTOR_ALPINE_IMAGE_NAME: alpine:3.20.2
-                OTEL_COLLECTOR_IMAGE_NAME: otel/opentelemetry-collector-contrib:0.117.0
-        pull_policy: always
-    predictions:
-        build:
-            context: .
-        pull_policy: always
-    backend:
-        container_name: backend
-        image: ${BACKEND_IMAGE_NAME-ghcr.io/highlight/highlight-backend:latest}
-        restart: on-failure
-        ports:
-            - '0.0.0.0:8082:8082'
-        volumes:
-            - highlight-data:/highlight-data
-            - ../backend/env.enc:/build/env.enc
-            - ../backend/env.enc.dgst:/build/env.enc.dgst
-            - ../backend/localhostssl/server.key:/build/localhostssl/server.key
-            - ../backend/localhostssl/server.crt:/build/localhostssl/server.crt
-        env_file: .env
+version: '3.8'
 
-    frontend:
-        container_name: frontend
-        image: ${FRONTEND_IMAGE_NAME-ghcr.io/highlight/highlight-frontend:latest}
-        restart: on-failure
-        volumes:
-            - ../backend/localhostssl/server.key:/etc/ssl/private/ssl-cert.key
-            - ../backend/localhostssl/server.pem:/etc/ssl/certs/ssl-cert.pem
-        ports:
-            - '0.0.0.0:3000:3000'
-            - '0.0.0.0:6006:6006'
-            - '0.0.0.0:8080:8080'
-        env_file: .env
+services:
+  # Infrastructure services
+  clickhouse:
+    image: $CLICKHOUSE_IMAGE_NAME
+    restart: on-failure
+    environment:
+      - CLICKHOUSE_DB: $CLICKHOUSE_DATABASE
+      - CLICKHOUSE_USER: $CLICKHOUSE_USERNAME
+      - CLICKHOUSE_PASSWORD: $CLICKHOUSE_PASSWORD
+
+  kafka:
+    image: $KAFKA_IMAGE_NAME
+    restart: on-failure
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: $KAFKA_ADVERTISED_LISTENERS
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+
+  zookeeper:
+    image: $ZOOKEEPER_IMAGE_NAME
+    restart: on-failure
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+
+  postgres:
+    image: $POSTGRES_IMAGE_NAME
+    restart: on-failure
+    environment:
+      - POSTGRES_USER: $PSQL_USER
+      - POSTGRES_PASSWORD: $PSQL_PASSWORD
+      - POSTGRES_DB: $PSQL_DB
+
+  redis:
+    image: $REDIS_IMAGE_NAME
+    restart: on-failure
+
+  collector:
+    image: $OTEL_COLLECTOR_IMAGE_NAME
+    restart: on-failure
+    depends_on:
+      - clickhouse
+      - kafka
+    build:
+      context: .
+      args:
+        OTEL_COLLECTOR_ALPINE_IMAGE_NAME: $OTEL_COLLECTOR_BUILD_IMAGE_NAME
+        OTEL_COLLECTOR_IMAGE_NAME: $OTEL_COLLECTOR_IMAGE_NAME
+
+  predictions:
+    restart: on-failure
+    depends_on:
+      - clickhouse
+      - kafka
+      - postgres
+      - redis
+
+  # Application services
+  backend:
+    image: $BACKEND_IMAGE_NAME
+    container_name: backend
+    restart: on-failure
+    ports:
+      - '0.0.0.0:8082:8082'
+    volumes:
+      - highlight-data:/highlight-data
+      - ../backend/env.enc:/build/env.enc
+      - ../backend/env.enc.dgst:/build/env.enc.dgst
+      - ../backend/localhostssl/server.key:/build/localhostssl/server.key
+      - ../backend/localhostssl/server.crt:/build/localhostssl/server.crt
+    environment:
+      - CLICKHOUSE_ADDRESS: clickhouse:9000
+      - IN_DOCKER: true
+      - IN_DOCKER_GO: true
+      - KAFKA_SERVERS: kafka:9092
+      - ON_PREM: true
+      - OTLP_ENDPOINT: http://collector:4318
+      - PSQL_HOST: postgres
+      - REDIS_EVENTS_STAGING_ENDPOINT: redis:6379
+      - TZ: $TZ
+    depends_on:
+      - clickhouse
+      - kafka
+      - postgres
+      - redis
+      - collector
+
+  frontend:
+    image: $FRONTEND_IMAGE_NAME
+    container_name: frontend
+    restart: on-failure
+    volumes:
+      - ../backend/localhostssl/server.key:/etc/ssl/private/ssl-cert.key
+      - ../backend/localhostssl/server.pem:/etc/ssl/certs/ssl-cert.pem
+    ports:
+      - '0.0.0.0:3000:3000'
+      - '0.0.0.0:6006:6006'
+      - '0.0.0.0:8080:8080'
+    environment:
+      - REACT_APP_IN_DOCKER: true
+      - REACT_APP_FRONTEND_URI: http://localhost:3000
+      - REACT_APP_PRIVATE_GRAPH_URI: http://localhost:8082/private
+      - REACT_APP_PUBLIC_GRAPH_URI: http://localhost:8082/public
+      - REACT_APP_OTLP_ENDPOINT: http://localhost:4318
+      - TZ: $TZ
+    depends_on:
+      - backend
 
 volumes:
-    highlight-data:
+  highlight-data:
 
-x-common: &common
-  restart: unless-stopped
+networks:
+  default:
+    name: highlight
