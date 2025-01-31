@@ -1,5 +1,25 @@
-# Highlight.io services for the hobby deployment.
 services:
+    clickhouse:
+        pull_policy: always
+    kafka:
+        pull_policy: always
+    postgres:
+        pull_policy: always
+    redis:
+        pull_policy: always
+    zookeeper:
+        pull_policy: always
+    collector:
+        build:
+            context: .
+            args:
+                OTEL_COLLECTOR_ALPINE_IMAGE_NAME: alpine:3.20.2
+                OTEL_COLLECTOR_IMAGE_NAME: otel/opentelemetry-collector-contrib:0.117.0
+        pull_policy: always
+    predictions:
+        build:
+            context: .
+        pull_policy: always
     backend:
         container_name: backend
         image: ${BACKEND_IMAGE_NAME-ghcr.io/highlight/highlight-backend:latest}
@@ -29,3 +49,6 @@ services:
 
 volumes:
     highlight-data:
+
+x-common: &common
+  restart: unless-stopped
