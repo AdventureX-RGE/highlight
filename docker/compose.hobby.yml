@@ -7,8 +7,6 @@ services:
       - "8082:8082"
     volumes:
       - highlight-data:/highlight-data
-      - ./backend/localhostssl/server.key:/build/env.enc  
-      - ./backend/localhostssl/server.crt:/build/env.enc 
     env_file: .env
 
   frontend-highlight:
