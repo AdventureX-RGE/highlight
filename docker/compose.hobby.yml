@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   backend:
     container_name: backend
@@ -11,8 +9,6 @@ services:
       - highlight-data:/highlight-data
       - ./backend/env.enc:/build/env.enc
       - ./backend/env.enc.dgst:/build/env.enc.dgst
-      - ./backend/localhostssl/server.key:/build/localhostssl/server.key
-      - ./backend/localhostssl/server.crt:/build/localhostssl/server.crt
     env_file: .env
 
   frontend:
@@ -20,12 +16,9 @@ services:
     image: ${FRONTEND_IMAGE_NAME:-ghcr.io/highlight/highlight-frontend:latest}
     restart: on-failure
     ports:
-      - "3001:3000"   
+      - "3001:3000" 
       - "6006:6006"
       - "8080:8080"
-    volumes:
-      - ./backend/localhostssl/server.key:/etc/ssl/private/ssl-cert.key
-      - ./backend/localhostssl/server.pem:/etc/ssl/certs/ssl-cert.pem
     env_file: .env
 
 volumes:
