@@ -1,6 +1,6 @@
 services:
   backend-highlight:
-    container_name: backend
+    container_name: backend-highlight
     image: ${BACKEND_IMAGE_NAME:-ghcr.io/highlight/highlight-backend:latest}
     restart: on-failure
     ports:
@@ -10,7 +10,7 @@ services:
     env_file: .env
 
   frontend-highlight:
-    container_name: frontend
+    container_name: frontend-highlight
     image: ${FRONTEND_IMAGE_NAME:-ghcr.io/highlight/highlight-frontend:latest}
     restart: on-failure
     ports:
