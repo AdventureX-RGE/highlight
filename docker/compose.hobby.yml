@@ -1,5 +1,5 @@
 services:
-  backend:
+  backend-highlight:
     container_name: backend
     image: ${BACKEND_IMAGE_NAME:-ghcr.io/highlight/highlight-backend:latest}
     restart: on-failure
@@ -9,7 +9,7 @@ services:
       - highlight-data:/highlight-data
     env_file: .env
 
-  frontend:
+  frontend-highlight:
     container_name: frontend
     image: ${FRONTEND_IMAGE_NAME:-ghcr.io/highlight/highlight-frontend:latest}
     restart: on-failure
