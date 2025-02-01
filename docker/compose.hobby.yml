@@ -7,8 +7,6 @@ services:
       - "8082:8082"
     volumes:
       - highlight-data:/highlight-data
-      - ./backend/env.enc:/build/env.enc
-      - ./backend/env.enc.dgst:/build/env.enc.dgst
     env_file: .env
 
   frontend:
@@ -16,7 +14,7 @@ services:
     image: ${FRONTEND_IMAGE_NAME:-ghcr.io/highlight/highlight-frontend:latest}
     restart: on-failure
     ports:
-      - "3001:3000" 
+      - "3001:3000"  
       - "6006:6006"
       - "8080:8080"
     env_file: .env
