@@ -20,11 +20,10 @@ services:
     image: ${FRONTEND_IMAGE_NAME:-ghcr.io/highlight/highlight-frontend:latest}
     restart: on-failure
     ports:
-      - "3000:3000"
+      - "3001:3000"   
       - "6006:6006"
       - "8080:8080"
     volumes:
-      # 这里假设你不需要将 SSH key 挂载，而仅仅挂载 SSL 相关文件
       - ./backend/localhostssl/server.key:/etc/ssl/private/ssl-cert.key
       - ./backend/localhostssl/server.pem:/etc/ssl/certs/ssl-cert.pem
     env_file: .env
