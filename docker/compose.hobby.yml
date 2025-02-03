@@ -1,71 +1,29 @@
+version: "3.8"
+
 services:
   backend-highlight:
     container_name: backend-highlightio
-    image: ghcr.io/highlight/highlight-backend:docker-v0.4.10
+    image: ${BACKEND_IMAGE_NAME:-ghcr.io/highlight/highlight-backend:latest}
     restart: on-failure
     ports:
       - "8082:8082"
     volumes:
       - highlight-data:/highlight-data
-    environment:
-      COMPOSE_PATH_SEPARATOR: ":"
-      COMPOSE_PROJECT_NAME: highlight
-      COMPOSE_FILE: compose.yml
-      BACKEND_IMAGE_NAME: ghcr.io/highlight/highlight-backend:docker-v0.4.10
-      FRONTEND_IMAGE_NAME: ghcr.io/highlight/highlight-frontend:docker-v0.4.10
-      CLICKHOUSE_IMAGE_NAME: clickhouse/clickhouse-server:24.3.15.72-alpine
-      KAFKA_IMAGE_NAME: confluentinc/cp-kafka:7.7.0
-      OTEL_COLLECTOR_BUILD_IMAGE_NAME: alpine:3.20.2
-      OTEL_COLLECTOR_IMAGE_NAME: otel/opentelemetry-collector-contrib:0.117.0
-      POSTGRES_IMAGE_NAME: ankane/pgvector:v0.5.1
-      REDIS_IMAGE_NAME: redis:7.4.0
-      ZOOKEEPER_IMAGE_NAME: confluentinc/cp-zookeeper:7.7.0
-      CLICKHOUSE_DATABASE: default
-      CLICKHOUSE_USERNAME: default
-      DOPPLER_CONFIG: docker
-      EMAIL_OPT_OUT_SALT: salt
-      ENVIRONMENT: dev
-      GOMEMLIMIT: 16GiB
-      KAFKA_TOPIC: dev
-      OAUTH_REDIRECT_URL: https://localhost:8082/private/oauth/callback
-      OBJECT_STORAGE_FS: /highlight-data
-      PSQL_DB: postgres
-      PSQL_DOCKER_HOST: postgres
-      PSQL_PORT: 5432
-      PSQL_USER: postgres
-      REACT_APP_DISABLE_ANALYTICS: "false"
-      REACT_APP_FRONTEND_ORG: "1"
-      REACT_APP_FRONTEND_URI: http://localhost:3000
-      REACT_APP_IN_DOCKER: "true"
-      REACT_APP_PRIVATE_GRAPH_URI: http://localhost:8082/private
-      REACT_APP_PUBLIC_GRAPH_URI: http://localhost:8082/public
-      REACT_APP_OTLP_ENDPOINT: http://localhost:4318
-      RENDER_PREVIEW: "true"
-      SESSION_FILE_PATH_PREFIX: /tmp/
-      TZ: America/Los_Angeles
-      SSL: "false"
-      DISABLE_CORS: "false"
-      REACT_APP_AUTH_MODE: password
-      ADMIN_PASSWORD: adventurex2025
+    env_file:
+      - ./docker/.env
     depends_on:
       - infra-init
 
   frontend-highlight:
     container_name: frontend-highlightio
-    image: ghcr.io/highlight/highlight-frontend:docker-v0.4.10
+    image: ${FRONTEND_IMAGE_NAME:-ghcr.io/highlight/highlight-frontend:latest}
     restart: on-failure
     ports:
-      - "3001:3000"  
+      - "3001:3000"
       - "6006:6006"
       - "8080:8080"
-    environment:
-      REACT_APP_DISABLE_ANALYTICS: "false"
-      REACT_APP_FRONTEND_ORG: "1"
-      REACT_APP_FRONTEND_URI: http://localhost:3000
-      REACT_APP_IN_DOCKER: "true"
-      REACT_APP_PRIVATE_GRAPH_URI: http://localhost:8082/private
-      REACT_APP_PUBLIC_GRAPH_URI: http://localhost:8082/public
-      REACT_APP_OTLP_ENDPOINT: http://localhost:4318
+    env_file:
+      - ./docker/.env
     depends_on:
       - infra-init
 
@@ -74,15 +32,28 @@ services:
     container_name: infra-init
     volumes:
       - .:/app
+      - ./docker/.env:/app/.env
     working_dir: /app
     entrypoint: ["/bin/sh", "-c"]
     command: |
+      echo "Loading environment variables..."
+      set -a
+      [ -f /app/.env ] && source /app/.env
+      set +a
+      echo "Loaded environment variables:"
+      env
+
+      if [ -z "$OTEL_COLLECTOR_ALPINE_IMAGE_NAME" ] || [ -z "$OTEL_COLLECTOR_IMAGE_NAME" ]; then
+        echo "ERROR: Required environment variables are missing!"
+        exit 1
+      fi
+
       echo "Starting infrastructure services..."
-      SERVICES="clickhouse kafka postgres redis zookeeper collector predictions"
-      docker compose pull $SERVICES
-      docker compose build --pull $SERVICES
-      docker compose up --detach --wait --remove-orphans $SERVICES
-      echo "Infrastructure started!"
+      docker compose up --detach --wait --remove-orphans clickhouse kafka postgres redis zookeeper collector predictions
+
+      echo "Highlight infrastructure started!"
+    env_file:
+      - ./docker/.env
     stdin_open: true
     tty: true
     depends_on:
@@ -94,6 +65,13 @@ services:
       - collector
       - predictions
 
+  postgres:
+    image: postgres:latest
+    container_name: postgres
+    restart: unless-stopped
+    env_file:
+      - ./docker/.env
+
   clickhouse:
     image: clickhouse/clickhouse-server:24.3.15.72-alpine
     container_name: clickhouse
@@ -103,15 +81,6 @@ services:
     image: confluentinc/cp-kafka:7.7.0
     container_name: kafka
     restart: unless-stopped
-
-  postgres:
-    image: ankane/pgvector:v0.5.1
-    container_name: postgres
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ""
-      POSTGRES_DB: postgres
 
   redis:
     image: redis:7.4.0
