@@ -10,7 +10,7 @@ services:
     volumes:
       - highlight-data:/highlight-data
     env_file:
-      - ./docker/.env
+      - .env
     depends_on:
       - infra-init
 
@@ -23,7 +23,7 @@ services:
       - "6006:6006"
       - "8080:8080"
     env_file:
-      - ./docker/.env
+      - .env
     depends_on:
       - infra-init
 
@@ -32,7 +32,7 @@ services:
     container_name: infra-init
     volumes:
       - .:/app
-      - ./docker/.env:/app/.env
+      - .env:/app/.env
     working_dir: /app
     entrypoint: ["/bin/sh", "-c"]
     command: |
@@ -53,7 +53,7 @@ services:
 
       echo "Highlight infrastructure started!"
     env_file:
-      - ./docker/.env
+      - .env
     stdin_open: true
     tty: true
     depends_on:
@@ -70,7 +70,7 @@ services:
     container_name: postgres
     restart: unless-stopped
     env_file:
-      - ./docker/.env
+      - .env
 
   clickhouse:
     image: clickhouse/clickhouse-server:24.3.15.72-alpine
