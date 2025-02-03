@@ -1,9 +1,83 @@
 version: "3.8"
 
 services:
-  test-nginx:
-    image: nginx:latest
-    container_name: test-nginx
-    restart: unless-stopped
+  backend-highlight:
+    container_name: backend-highlightio
+    image: ${BACKEND_IMAGE_NAME:-ghcr.io/highlight/highlight-backend:latest}
+    restart: on-failure
     ports:
-      - "8081:80"
+      - "8082:8082"
+    volumes:
+      - highlight-data:/highlight-data
+    env_file:
+      - ./docker/.env
+    depends_on:
+      - infra-init
+
+  frontend-highlight:
+    container_name: frontend-highlightio
+    image: ${FRONTEND_IMAGE_NAME:-ghcr.io/highlight/highlight-frontend:latest}
+    restart: on-failure
+    ports:
+      - "3001:3000"  
+      - "6006:6006"
+      - "8080:8080"
+    env_file:
+      - ./docker/.env
+    depends_on:
+      - infra-init
+
+  infra-init:
+    image: alpine:latest
+    container_name: infra-init
+    volumes:
+      - .:/app
+      - ./docker/.env:/app/.env
+    working_dir: /app
+    entrypoint: ["/bin/sh", "-c"]
+    command: |
+      echo "Loading environment variables..."
+      set -a
+      [ -f /app/.env ] && source /app/.env
+      set +a
+      echo "Loaded environment variables:"
+      env
+
+      if [ -z "$OTEL_COLLECTOR_ALPINE_IMAGE_NAME" ] || [ -z "$OTEL_COLLECTOR_IMAGE_NAME" ]; then
+        echo "ERROR: Required environment variables are missing!"
+        exit 1
+      fi
+
+      SERVICES="clickhouse kafka postgres redis zookeeper collector predictions"
+      BUILD_ARGS="--build-arg OTEL_COLLECTOR_ALPINE_IMAGE_NAME=${OTEL_COLLECTOR_ALPINE_IMAGE_NAME} \
+                  --build-arg OTEL_COLLECTOR_IMAGE_NAME=${OTEL_COLLECTOR_IMAGE_NAME}"
+
+      echo "Pulling latest images..."
+      docker compose pull $SERVICES
+
+      echo "Building services..."
+      docker compose build --pull $BUILD_ARGS $SERVICES
+
+      echo "Starting infrastructure services..."
+      docker compose up --detach --wait --remove-orphans $SERVICES
+
+      echo "Highlight infrastructure started!"
+    stdin_open: true
+    tty: true
+    depends_on:
+      - clickhouse
+      - kafka
+      - postgres
+      - redis
+      - zookeeper
+      - collector
+      - predictions
+
+  collector:
+    image: ${OTEL_COLLECTOR_IMAGE_NAME:-otel-collector}
+    restart: unless-stopped
+    env_file:
+      - ./docker/.env
+
+volumes:
+  highlight-data:
