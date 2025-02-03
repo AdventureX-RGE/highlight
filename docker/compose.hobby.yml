@@ -1,29 +1,9 @@
-services:
-  backend-highlight:
-    container_name: backend-highlightio
-    image: ${BACKEND_IMAGE_NAME:-ghcr.io/highlight/highlight-backend:latest}
-    restart: on-failure
-    ports:
-      - "8082:8082"
-    volumes:
-      - highlight-data:/highlight-data
-    env_file:
-      - .env
-    depends_on:
-      - infra-init
+version: "3.8"
 
-  frontend-highlight:
-    container_name: frontend-highlightio
-    image: ${FRONTEND_IMAGE_NAME:-ghcr.io/highlight/highlight-frontend:latest}
-    restart: on-failure
+services:
+  test-nginx:
+    image: nginx:latest
+    container_name: test-nginx
+    restart: unless-stopped
     ports:
-      - "3001:3000"  
-      - "6006:6006"
-      - "8080:8080"
-    env_file:
-      - .env
-    depends_on:
-      - infra-init
-      
-volumes:
-  highlight-data:
+      - "8081:80"
