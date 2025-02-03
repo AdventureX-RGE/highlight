@@ -1,3 +1,5 @@
+version: "3.8"
+
 services:
   backend-highlight:
     container_name: backend-highlightio
@@ -7,7 +9,8 @@ services:
       - "8082:8082"
     volumes:
       - highlight-data:/highlight-data
-    env_file: .env
+    env_file:
+      - ./docker/.env
     depends_on:
       - infra-init
 
@@ -19,7 +22,8 @@ services:
       - "3001:3000"  
       - "6006:6006"
       - "8080:8080"
-    env_file: .env
+    env_file:
+      - ./docker/.env
     depends_on:
       - infra-init
 
@@ -28,11 +32,18 @@ services:
     container_name: infra-init
     volumes:
       - .:/app
+      - ./docker/.env:/app/.env
     working_dir: /app
     entrypoint: ["/bin/sh", "-c"]
     command: |
       echo "Loading environment variables..."
-      source env.sh
+      export $(grep -v '^#' /app/.env | xargs)
+
+      echo "Checking required environment variables..."
+      if [ -z "$OTEL_COLLECTOR_ALPINE_IMAGE_NAME" ] || [ -z "$OTEL_COLLECTOR_IMAGE_NAME" ]; then
+        echo "ERROR: Required environment variables are missing!"
+        exit 1
+      fi
 
       SERVICES="clickhouse kafka postgres redis zookeeper collector predictions"
       BUILD_ARGS="--build-arg OTEL_COLLECTOR_ALPINE_IMAGE_NAME=${OTEL_COLLECTOR_ALPINE_IMAGE_NAME} \
@@ -63,7 +74,8 @@ services:
       fi
 
       echo "Highlight infrastructure started!"
-    env_file: .env
+    env_file:
+      - ./docker/.env
     stdin_open: true
     tty: true
     depends_on:
@@ -78,6 +90,8 @@ services:
   collector:
     image: ${OTEL_COLLECTOR_IMAGE_NAME:-otel-collector}
     restart: unless-stopped
+    env_file:
+      - ./docker/.env
 
 volumes:
   highlight-data:
