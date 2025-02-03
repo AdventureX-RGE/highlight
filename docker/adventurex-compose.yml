@@ -1,0 +1,5 @@
+version: '3'
+services:
+  app:
+    image: my-app
+    command: ["/bin/bash", "/app/docker/start-infra.sh"]
